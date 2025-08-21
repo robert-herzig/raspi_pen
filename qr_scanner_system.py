@@ -41,20 +41,59 @@ class QRScanner:
     def start_camera(self):
         """Initialize the camera capture."""
         try:
-            self.cap = cv2.VideoCapture(self.camera_index)
-            if not self.cap.isOpened():
-                raise RuntimeError("Could not open camera")
+            # Try different camera backends for Raspberry Pi
+            backends_to_try = [
+                cv2.CAP_V4L2,  # Video4Linux2 - most reliable on RPi
+                cv2.CAP_GSTREAMER,  # GStreamer (if it works)
+                cv2.CAP_ANY,  # Let OpenCV choose
+            ]
+            
+            for backend in backends_to_try:
+                print(f"Trying camera backend: {backend}")
+                self.cap = cv2.VideoCapture(self.camera_index, backend)
+                
+                if self.cap.isOpened():
+                    # Test if we can actually read a frame
+                    ret, test_frame = self.cap.read()
+                    if ret and test_frame is not None:
+                        print(f"Camera opened successfully with backend: {backend}")
+                        break
+                    else:
+                        print(f"Backend {backend} opened but cannot read frames")
+                        self.cap.release()
+                        self.cap = None
+                else:
+                    print(f"Backend {backend} failed to open camera")
+                    if self.cap:
+                        self.cap.release()
+                        self.cap = None
+            
+            if not self.cap or not self.cap.isOpened():
+                raise RuntimeError("Could not open camera with any backend")
             
             # Set camera properties for better performance on RPi Zero 2 W
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-            self.cap.set(cv2.CAP_PROP_FPS, 15)  # Lower FPS for better performance
+            # Use lower resolution and frame rate
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)   # Lower resolution
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)  # Lower resolution
+            self.cap.set(cv2.CAP_PROP_FPS, 10)            # Lower FPS
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)      # Reduce buffer size
             
-            print("Camera initialized successfully")
+            # Try to set pixel format to reduce processing
+            try:
+                self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+            except:
+                pass  # Ignore if not supported
+            
+            print("Camera configured for optimal RPi Zero 2 W performance")
             return True
             
         except Exception as e:
             print(f"Error initializing camera: {e}")
+            print("\nTroubleshooting tips:")
+            print("1. Make sure camera is enabled: sudo raspi-config")
+            print("2. Check camera connection")
+            print("3. Try: sudo modprobe bcm2835-v4l2")
+            print("4. Check available cameras: ls /dev/video*")
             return False
     
     def decode_qr_codes(self, frame):
@@ -117,13 +156,19 @@ class QRScanner:
         print("Point the camera at a QR code to scan it.")
         print("-" * 50)
         
+        frame_count = 0
         try:
             while True:
                 # Capture frame from camera
                 ret, frame = self.cap.read()
-                if not ret:
-                    print("Failed to capture frame")
-                    break
+                if not ret or frame is None:
+                    print(f"Failed to capture frame {frame_count}")
+                    time.sleep(0.5)  # Wait a bit before retrying
+                    continue
+                
+                frame_count += 1
+                if frame_count % 30 == 0:  # Progress indicator every 30 frames
+                    print(f"Scanning... (frame {frame_count})")
                 
                 # Decode QR codes in the frame
                 qr_codes = self.decode_qr_codes(frame)
