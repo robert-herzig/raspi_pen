@@ -26,11 +26,11 @@ fi
 # If system packages don't work, create virtual environment
 if [ "$USE_VENV" = true ]; then
     echo "Creating virtual environment..."
-    python3 -m venv qr_scanner_env
+    python3 -m venv qr_scanner_env --system-site-packages
     
-    echo "Activating virtual environment and installing pyzbar..."
+    echo "Activating virtual environment and installing packages..."
     source qr_scanner_env/bin/activate
-    pip install pyzbar
+    pip install pyzbar opencv-python
     deactivate
     
     echo "Created virtual environment at: $(pwd)/qr_scanner_env"
