@@ -26,6 +26,11 @@ A lightweight Python script that uses the camera to detect and print QR code con
    ./setup_rpi.sh
    ```
 
+The setup script will automatically:
+- Try to install pyzbar from system packages first
+- If not available, create a virtual environment
+- Handle the externally-managed-environment issue in newer Raspberry Pi OS
+
 ### Manual Setup
 
 1. Update your system:
@@ -35,15 +40,23 @@ A lightweight Python script that uses the camera to detect and print QR code con
 
 2. Install system dependencies:
    ```bash
-   sudo apt install -y python3-pip python3-dev libzbar0 libzbar-dev libopencv-dev python3-opencv
+   sudo apt install -y python3-pip python3-dev python3-venv python3-full libzbar0 libzbar-dev libopencv-dev python3-opencv
    ```
 
-3. Install Python dependencies:
+3. Try system package first:
    ```bash
-   pip3 install pyzbar
+   sudo apt install python3-pyzbar
    ```
 
-4. Enable camera interface:
+4. If pyzbar is not available as system package, create virtual environment:
+   ```bash
+   python3 -m venv qr_scanner_env
+   source qr_scanner_env/bin/activate
+   pip install pyzbar
+   deactivate
+   ```
+
+5. Enable camera interface:
    ```bash
    sudo raspi-config nonint do_camera 0
    sudo reboot
@@ -51,10 +64,25 @@ A lightweight Python script that uses the camera to detect and print QR code con
 
 ## Usage
 
-Run the QR scanner:
+### If using system packages:
 ```bash
 python3 qr_scanner.py
 ```
+
+### If using virtual environment:
+```bash
+source qr_scanner_env/bin/activate
+python3 qr_scanner.py
+deactivate  # when done
+```
+
+### Easy run script:
+```bash
+chmod +x run_scanner.sh
+./run_scanner.sh
+```
+
+The `run_scanner.sh` script automatically detects whether to use the virtual environment or system Python.
 
 - Point the camera at a QR code
 - The content will be printed to the console
